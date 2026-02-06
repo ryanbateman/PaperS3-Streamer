@@ -7,7 +7,8 @@ It connects to your WiFi, receives Text or Images via a REST API, and displays t
 
 - **Wireless**: Connects via WiFi (DHCP).
 - **REST API**: Simple HTTP endpoints for Text and Images.
-- **Auto-Rotation**: Integreated IMU (Accelerometer) rotates content automatically.
+- **Auto-Rotation**: Integrated IMU (accelerometer) rotates content automatically.
+- **Auto-Shutdown**: Powers off after 3 minutes of inactivity to save battery.
 - **Pagination**: Automatically splits long text into multiple pages.
 - **Gesture Control**:
     - **Swipe Left/Right**: Next / Previous Page.
@@ -58,18 +59,22 @@ cat photo.jpg | python client/paper_cli.py image
 
 ## API Reference
 
+- **GET** `/api/status`
+    - Returns JSON with mode, memory stats, WiFi RSSI, screen dimensions, rotation.
+- **GET** `/api/screenshot`
+    - Returns current display as BMP image.
 - **POST** `/api/text`
     - Body: `{"text": "...", "size": 2, "clear": true}`
 - **POST** `/api/image`
     - Body: Multipart file upload (`name="file"`).
+- **POST** `/api/mqtt`
+    - Body: `{"broker": "mqtt.example.com", "topic": "sensors/#", "port": 1883, "username": "", "password": ""}`
+    - Subscribes to MQTT topic and displays messages.
 - **TCP Stream** `Port 2323`
     - Raw TCP socket for line-by-line streaming.
 - **Map Mode** (via CLI)
     - Uses Stadia Maps Static API with Stamen Toner style.
     - Requires `STADIA_API_KEY` environment variable or `--api-key` flag.
-- **POST** `/api/mqtt`
-    - Body: `{"broker": "mqtt.example.com", "topic": "sensors/#", "port": 1883, "username": "", "password": ""}`
-    - Subscribes to MQTT topic and displays messages.
 
 ## Stream Mode
 Connect to port `2323` via TCP to stream text line-by-line (like `tail -f`).
@@ -113,9 +118,6 @@ python client/paper_cli.py mqtt --broker "192.168.1.50" --port 1884 --topic "tes
 
 The device will display a "waiting for messages" screen until the first message arrives. Messages are displayed like text mode with pagination support.
 
-## Credits
-Built with M5Unified and PlatformIO.
-
 ## Testing
 To run the automated test suite, ensure you have python `pytest` and `requests` installed:
 ```bash
@@ -130,3 +132,9 @@ pytest -s
 # Linux/Mac
 PAPER_IP=192.168.1.XXX pytest -s
 ```
+
+## Credits
+Built with [M5Unified](https://github.com/m5stack/M5Unified), [ArduinoJson](https://arduinojson.org/), and [PubSubClient](https://pubsubclient.knolleary.net/) on [PlatformIO](https://platformio.org/).
+
+## License
+MIT License - see [LICENSE](LICENSE) for details.
