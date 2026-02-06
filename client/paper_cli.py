@@ -221,9 +221,17 @@ def main():
                     sys.exit(1)
                 
                 result = results[0]
-                lat = float(result["lat"])
-                lon = float(result["lon"])
                 location_name = result.get("display_name", args.location)
+                
+                # Calculate center from bounding box for better visual centering
+                if "boundingbox" in result:
+                    bbox = result["boundingbox"]  # [south, north, west, east]
+                    lat = (float(bbox[0]) + float(bbox[1])) / 2  # center latitude
+                    lon = (float(bbox[2]) + float(bbox[3])) / 2  # center longitude
+                else:
+                    # Fall back to point coordinates if no bounding box
+                    lat = float(result["lat"])
+                    lon = float(result["lon"])
                 
                 # Calculate appropriate zoom based on location type/bounding box
                 if zoom is None:
@@ -303,6 +311,12 @@ def main():
                 import io
                 
                 img = Image.open(io.BytesIO(img_data))
+                
+                # Resize from @2x back to device dimensions
+                # The @2x gives us sharper source, but we need to fit device screen
+                if img.size != (width, height):
+                    print(f"Resizing map from {img.size} to {width}x{height}...")
+                    img = img.resize((width, height), Image.Resampling.LANCZOS)
                 
                 # Convert to grayscale (Stamen Toner is already B&W but ensure clean conversion)
                 img = img.convert('L')
