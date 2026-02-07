@@ -10,7 +10,7 @@
 // Constants
 #define PORT 80
 #define PORT 80
-#define HEADER_HEIGHT 40
+#define HEADER_HEIGHT 44
 #define FOOTER_HEIGHT 60
 #define MARGIN 10
 #define MIN_FONT_SIZE 1
@@ -85,6 +85,77 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttReconnect();
 void handleRetain();
 void drawSleepOverlay();
+void drawHeader(const char* modeName);
+
+// =================================================================================
+// Unified Header Drawing
+// =================================================================================
+
+void drawHeader(const char* modeName) {
+    int w = M5.Display.width();
+    
+    // Fill header background
+    M5.Display.fillRect(0, 0, w, HEADER_HEIGHT, TFT_LIGHTGREY);
+    
+    // Draw bottom separator line
+    M5.Display.drawLine(0, HEADER_HEIGHT, w, HEADER_HEIGHT, TFT_BLACK);
+    
+    // Set text properties
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(TFT_BLACK);
+    
+    // Calculate vertical center with slight upward bias for visual balance
+    int fontH = M5.Display.fontHeight();
+    int yText = (HEADER_HEIGHT - fontH) / 2 + 1;  // +1 pushes text slightly down from pure center
+    
+    // === LEFT: IP Address ===
+    M5.Display.setCursor(MARGIN, yText);
+    M5.Display.print(WiFi.localIP());
+    
+    // === CENTER: Mode Name ===
+    if (modeName && strlen(modeName) > 0) {
+        int modeWidth = M5.Display.textWidth(modeName);
+        M5.Display.setCursor((w - modeWidth) / 2, yText);
+        M5.Display.print(modeName);
+    }
+    
+    // === RIGHT: Battery Icon + Percentage ===
+    int batLevel = M5.Power.getBatteryLevel();
+    String batText = String(batLevel) + "%";
+    int batTextWidth = M5.Display.textWidth(batText);
+    
+    // Battery icon dimensions
+    int batIconW = 24;
+    int batIconH = 12;
+    int batTerminalW = 3;
+    int batIconGap = 4;  // Gap between icon and text
+    
+    // Position from right edge: MARGIN | batText | gap | icon | terminal
+    int batTextX = w - MARGIN - batTextWidth;
+    int batIconX = batTextX - batIconGap - batIconW;
+    int batIconY = (HEADER_HEIGHT - batIconH) / 2;
+    
+    // Draw battery outline (main body)
+    M5.Display.drawRect(batIconX, batIconY, batIconW, batIconH, TFT_BLACK);
+    
+    // Draw battery terminal (the small nub on the right side of icon, left of text)
+    int termX = batIconX + batIconW;
+    int termY = batIconY + (batIconH - 6) / 2;  // Centered vertically, 6px tall
+    M5.Display.fillRect(termX, termY, batTerminalW, 6, TFT_BLACK);
+    
+    // Draw battery fill level (inside the outline)
+    int fillPadding = 2;
+    int maxFillW = batIconW - (fillPadding * 2);
+    int fillW = (batLevel * maxFillW) / 100;
+    if (fillW > 0) {
+        M5.Display.fillRect(batIconX + fillPadding, batIconY + fillPadding, 
+                           fillW, batIconH - (fillPadding * 2), TFT_BLACK);
+    }
+    
+    // Draw battery percentage text
+    M5.Display.setCursor(batTextX, yText);
+    M5.Display.print(batText);
+}
 
 void setup() {
     auto cfg = M5.config();
@@ -257,20 +328,19 @@ void drawWelcome(bool sleeping) {
     int h = M5.Display.height();
     String ip = WiFi.localIP().toString();
     
+    // Draw unified header (empty mode name for welcome screen)
+    drawHeader("");
+    
     M5.Display.setTextColor(TFT_BLACK);
     M5.Display.setTextDatum(middle_center);
     
-    int y = 40;
+    // Start content below header with padding
+    int y = HEADER_HEIGHT + MARGIN + 20;
     
     // Title - large
     M5.Display.setTextSize(3);
     M5.Display.drawString("Paper Piper", w/2, y);
     y += 50;
-    
-    // IP Address - very large
-    M5.Display.setTextSize(4);
-    M5.Display.drawString(ip, w/2, y);
-    y += 70;
     
     // Section spacing
     int sectionGap = 15;
@@ -554,24 +624,11 @@ void drawLayout() {
             M5.Display.print(pages[currentPage]);
         }
         
-        // Draw Status Bar Line
+        // Draw UI elements
         if (uiVisible) {
             // --- HEADER ---
-            M5.Display.fillRect(0, 0, M5.Display.width(), HEADER_HEIGHT, TFT_LIGHTGREY);
-            M5.Display.drawLine(0, HEADER_HEIGHT, M5.Display.width(), HEADER_HEIGHT, TFT_BLACK);
-            
-            M5.Display.setTextSize(2);
-            int yHead = (HEADER_HEIGHT/2) - (M5.Display.fontHeight()/2);
-            
-            // Left: IP
-            M5.Display.setCursor(MARGIN, yHead);
-            M5.Display.print(WiFi.localIP());
-            
-            // Right: Battery
-            int batLevel = M5.Power.getBatteryLevel();
-            String batInfo = String(batLevel) + "%";
-            M5.Display.setCursor(M5.Display.width() - MARGIN - M5.Display.textWidth(batInfo), yHead);
-            M5.Display.print(batInfo);
+            const char* modeName = (currentMode == MODE_MQTT) ? "MQTT" : "TEXT";
+            drawHeader(modeName);
 
             // --- FOOTER ---
             int yFoot = M5.Display.height() - FOOTER_HEIGHT;
@@ -645,22 +702,7 @@ void drawLayout() {
         }
         
         if (uiVisible) {
-             // Header Overlay
-            M5.Display.fillRect(0, 0, M5.Display.width(), HEADER_HEIGHT, TFT_LIGHTGREY);
-            M5.Display.drawLine(0, HEADER_HEIGHT, M5.Display.width(), HEADER_HEIGHT, TFT_BLACK);
-            
-            M5.Display.setTextSize(2);
-            M5.Display.setTextColor(TFT_BLACK); 
-            int yHead = (HEADER_HEIGHT/2) - (M5.Display.fontHeight()/2);
-            
-            M5.Display.setCursor(MARGIN, yHead);
-            M5.Display.print(WiFi.localIP());
-            
-            int batLevel = M5.Power.getBatteryLevel();
-            String batInfo = String(batLevel) + "%";
-            M5.Display.setCursor(M5.Display.width() - MARGIN - M5.Display.textWidth(batInfo), yHead);
-            M5.Display.print(batInfo);
-
+            drawHeader("IMAGE");
         }
     }
 
@@ -1056,7 +1098,7 @@ void drawStream() {
     M5.Display.setEpdMode(epd_mode_t::epd_fast); 
     
     int yStart = MARGIN;
-    if (uiVisible) yStart += HEADER_HEIGHT;
+    if (uiVisible) yStart += HEADER_HEIGHT + MARGIN;  // Consistent padding below header
     
     int scrH = M5.Display.height();
     int scrW = M5.Display.width();
@@ -1091,27 +1133,7 @@ void drawStream() {
     
     // Draw Header (if visible)
     if (uiVisible) {
-        // High-Contrast Header (No EPD Mode Switch needed)
-        
-        // 1. Clear background (remove any text from non-UI mode)
-        M5.Display.fillRect(0, 0, M5.Display.width(), HEADER_HEIGHT, TFT_WHITE);
-        
-        // 2. Draw Borders
-        M5.Display.drawRect(0, 0, M5.Display.width(), HEADER_HEIGHT, TFT_BLACK); 
-        // Or just the bottom line
-        // M5.Display.drawLine(0, HEADER_HEIGHT, M5.Display.width(), HEADER_HEIGHT, TFT_BLACK);
-        
-        M5.Display.setTextSize(2);
-        M5.Display.setTextColor(TFT_BLACK);
-        int yHead = (HEADER_HEIGHT/2) - (M5.Display.fontHeight()/2);
-        
-        M5.Display.setCursor(MARGIN, yHead);
-        M5.Display.print(WiFi.localIP());
-        
-        int batLevel = M5.Power.getBatteryLevel();
-        String batInfo = String(batLevel) + "%";
-        M5.Display.setCursor(M5.Display.width() - MARGIN - M5.Display.textWidth(batInfo), yHead);
-        M5.Display.print(batInfo);
+        drawHeader("STREAM");
     }
     
     M5.Display.startWrite(); M5.Display.endWrite();
