@@ -8,7 +8,7 @@ import io
 
 # Config
 PAPER_IP = os.environ.get("PAPER_IP")
-BASE_URL = f"http://{PAPER_IP}"
+BASE_URL = f"http://{PAPER_IP}" if PAPER_IP else None
 
 @pytest.fixture
 def check_ip():
@@ -24,6 +24,9 @@ def test_health_check(check_ip):
         print(f"\nDevice Status: {data}")
         assert "mode" in data
         assert "heap_free" in data
+        assert "retain" in data, "Missing 'retain' field in status"
+        assert "screen_width" in data
+        assert "screen_height" in data
         # Lower threshold to 30KB (ESP32S3 Arduino usage can be heavy)
         assert data["heap_free"] > 30000, f"Heap critically low: {data['heap_free']}"
     except Exception as e:
@@ -111,6 +114,38 @@ def test_stream_mode(check_ip):
     
     # Visual Check
     check_screenshot("STREAM_MODE")
+
+def test_retain_mode(check_ip):
+    """Verify retain mode API works."""
+    # Enable retain
+    resp = requests.post(f"{BASE_URL}/api/retain", json={"retain": True}, timeout=5)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["retain"] == True, f"Retain should be True, got: {data}"
+    
+    # Verify via status
+    status = requests.get(f"{BASE_URL}/api/status").json()
+    assert status["retain"] == True, f"Status should show retain=True"
+    
+    # Disable retain
+    resp = requests.post(f"{BASE_URL}/api/retain", json={"retain": False}, timeout=5)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["retain"] == False, f"Retain should be False, got: {data}"
+    
+    # Test toggle (no body)
+    resp = requests.post(f"{BASE_URL}/api/retain", timeout=5)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["retain"] == True, f"Toggle should enable retain, got: {data}"
+    
+    # Toggle again
+    resp = requests.post(f"{BASE_URL}/api/retain", timeout=5)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["retain"] == False, f"Toggle should disable retain, got: {data}"
+    
+    print("\nRetain mode API working correctly")
 
 def test_stress_cycle(check_ip):
     """Rapidly cycle modes to check for stability."""
