@@ -9,12 +9,29 @@
 
 // Constants
 #define PORT 80
-#define PORT 80
 #define HEADER_HEIGHT 44
 #define FOOTER_HEIGHT 60
 #define MARGIN 10
-#define MIN_FONT_SIZE 1
-#define MAX_FONT_SIZE 6
+#define MIN_FONT_LEVEL 0
+#define MAX_FONT_LEVEL 3
+#define DEFAULT_FONT_LEVEL 1
+
+// Font arrays for different modes
+// Text mode: proportional fonts for readable prose
+const lgfx::GFXfont* textFonts[] = {
+    &fonts::DejaVu12,
+    &fonts::DejaVu18,
+    &fonts::DejaVu24,
+    &fonts::DejaVu40,
+};
+
+// MQTT/Stream mode: monospace fonts for JSON/logs
+const lgfx::GFXfont* monoFonts[] = {
+    &fonts::FreeMono9pt7b,
+    &fonts::FreeMonoBold12pt7b,
+    &fonts::FreeMono18pt7b,
+    &fonts::FreeMonoBold24pt7b,
+};
 
 // Globals
 WebServer server(PORT);
@@ -53,7 +70,7 @@ String mqttLastMessage = "";
 String fullText = "";
 std::vector<String> pages;
 int currentPage = 0;
-int currentTextSize = 2; // Default size
+int currentFontLevel = DEFAULT_FONT_LEVEL; // 0-3, index into font arrays
 M5Canvas canvas(&M5.Display); // Global Sprite
 
 // Power Management
@@ -85,6 +102,21 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttReconnect();
 void drawSleepOverlay();
 void drawHeader(const char* modeName);
+void applyBodyFont();
+
+// =================================================================================
+// Font Helper
+// =================================================================================
+
+void applyBodyFont() {
+    // Apply appropriate font based on current mode and font level
+    if (currentMode == MODE_MQTT || currentMode == MODE_STREAM) {
+        M5.Display.setFont(monoFonts[currentFontLevel]);
+    } else {
+        M5.Display.setFont(textFonts[currentFontLevel]);
+    }
+    M5.Display.setTextSize(1);  // Always 1 with GFX fonts
+}
 
 // =================================================================================
 // Unified Header Drawing
@@ -100,8 +132,9 @@ void drawHeader(const char* modeName) {
     // Draw bottom separator line
     M5.Display.drawLine(0, HEADER_HEIGHT, w, HEADER_HEIGHT, TFT_BLACK);
     
-    // Set text properties
-    M5.Display.setTextSize(2);
+    // Set text properties - use monospace font for header
+    M5.Display.setFont(&fonts::FreeMonoBold9pt7b);
+    M5.Display.setTextSize(1);
     M5.Display.setTextColor(TFT_BLACK);
     
     // === LEFT: IP Address ===
@@ -226,7 +259,9 @@ void calculatePages() {
     
     if (fullText.length() == 0) return;
 
-    M5.Display.setTextSize(currentTextSize);
+    // Apply the appropriate GFX font for accurate measurement
+    applyBodyFont();
+    
     int screenW = M5.Display.width();
     int screenH = M5.Display.height();
     if (uiVisible) {
@@ -334,68 +369,63 @@ void drawWelcome(bool sleeping) {
     
     M5.Display.setTextColor(TFT_BLACK);
     M5.Display.setTextDatum(middle_center);
+    M5.Display.setTextSize(1);
     
     // Start content below header with padding
-    int y = HEADER_HEIGHT + MARGIN + 20;
+    int y = HEADER_HEIGHT + MARGIN + 30;
     
-    // Title - large
-    M5.Display.setTextSize(3);
+    // Title - large (use DejaVu for nice title)
+    M5.Display.setFont(&fonts::DejaVu40);
     M5.Display.drawString("Paper Piper", w/2, y);
-    y += 50;
+    y += 60;
     
     // Section spacing
-    int sectionGap = 15;
-    int cmdLineH = 32; // Line height for size 2
+    int sectionGap = 18;
+    int cmdLineH = 28;
     
     // TEXT MODE
-    M5.Display.setTextSize(3);
+    M5.Display.setFont(&fonts::FreeMono18pt7b);
     M5.Display.drawString("-- TEXT --", w/2, y);
-    y += 40;
-    M5.Display.setTextSize(2);
+    y += 36;
+    M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
     M5.Display.drawString("paper_cli.py text \"Hello\"", w/2, y);
     y += cmdLineH;
     M5.Display.drawString("curl -d 'msg' " + ip + "/api/text", w/2, y);
     y += cmdLineH + sectionGap;
     
     // IMAGE MODE
-    M5.Display.setTextSize(3);
+    M5.Display.setFont(&fonts::FreeMono18pt7b);
     M5.Display.drawString("-- IMAGE --", w/2, y);
-    y += 40;
-    M5.Display.setTextSize(2);
+    y += 36;
+    M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
     M5.Display.drawString("paper_cli.py image < photo.jpg", w/2, y);
     y += cmdLineH + sectionGap;
     
     // STREAM MODE
-    M5.Display.setTextSize(3);
+    M5.Display.setFont(&fonts::FreeMono18pt7b);
     M5.Display.drawString("-- STREAM --", w/2, y);
-    y += 40;
-    M5.Display.setTextSize(2);
+    y += 36;
+    M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
     M5.Display.drawString("nc " + ip + " 2323", w/2, y);
-    y += cmdLineH;
-    M5.Display.drawString("paper_cli.py stream", w/2, y);
     y += cmdLineH + sectionGap;
     
     // MAP MODE
-    M5.Display.setTextSize(3);
+    M5.Display.setFont(&fonts::FreeMono18pt7b);
     M5.Display.drawString("-- MAP --", w/2, y);
-    y += 40;
-    M5.Display.setTextSize(2);
-    M5.Display.drawString("paper_cli.py map", w/2, y);
-    y += cmdLineH;
-    M5.Display.drawString("--location \"Berlin, Germany\"", w/2, y);
+    y += 36;
+    M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
+    M5.Display.drawString("paper_cli.py map --location \"Berlin\"", w/2, y);
     y += cmdLineH + sectionGap;
     
     // MQTT MODE
-    M5.Display.setTextSize(3);
+    M5.Display.setFont(&fonts::FreeMono18pt7b);
     M5.Display.drawString("-- MQTT --", w/2, y);
-    y += 40;
-    M5.Display.setTextSize(2);
-    M5.Display.drawString("paper_cli.py mqtt", w/2, y);
-    y += cmdLineH;
-    M5.Display.drawString("--broker host --topic sensors/#", w/2, y);
+    y += 36;
+    M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
+    M5.Display.drawString("paper_cli.py mqtt --broker host", w/2, y);
     
     if (sleeping) {
-        M5.Display.setTextSize(3);
+        M5.Display.setFont(&fonts::FreeMono18pt7b);
         M5.Display.setTextDatum(bottom_center);
         M5.Display.drawString("Sleeping...", w/2, h - 20);
     }
@@ -418,12 +448,26 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     
     mqttLastMessage = message;
     
+    // Check if message is JSON and pretty-print it
+    String trimmed = message;
+    trimmed.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, trimmed);
+        if (!err) {
+            // Successfully parsed JSON - pretty-print it
+            message = "";
+            serializeJsonPretty(doc, message);
+        }
+        // If parse fails, just use the original message
+    }
+    
     // Update display with new message (reuse text mode logic)
     fullText = message;
     fullText.replace("\r", "");
     fullText.replace("\\n", "\n");
     
-    currentTextSize = 2; // Default size
+    currentFontLevel = DEFAULT_FONT_LEVEL;
     calculatePages();
     drawLayout();
 }
@@ -545,7 +589,7 @@ void drawSleepOverlay() {
     if (currentMode == MODE_TEXT || currentMode == MODE_MQTT) {
         if (!pages.empty() && currentPage < pages.size()) {
             M5.Display.setTextColor(TFT_BLACK);
-            M5.Display.setTextSize(currentTextSize);
+            applyBodyFont();  // Use GFX font based on mode and level
             M5.Display.setCursor(MARGIN, sleepPadding);
             M5.Display.print(pages[currentPage]);
         }
@@ -571,7 +615,8 @@ void drawSleepOverlay() {
     M5.Display.drawLine(0, overlayY, w, overlayY, TFT_BLACK);
     
     // Draw "Sleeping..." centered in overlay
-    M5.Display.setTextSize(2);
+    M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
+    M5.Display.setTextSize(1);
     M5.Display.setTextColor(TFT_BLACK);
     M5.Display.setTextDatum(middle_center);
     M5.Display.drawString("Sleeping...", w / 2, overlayY + (overlayHeight / 2));
@@ -591,7 +636,7 @@ void drawLayout() {
         // Draw Text
         if (!pages.empty() && currentPage < pages.size()) {
             M5.Display.setTextColor(TFT_BLACK);
-            M5.Display.setTextSize(currentTextSize);
+            applyBodyFont();  // Use GFX font based on mode and level
             int yStart = MARGIN;
             if (uiVisible) yStart += HEADER_HEIGHT + MARGIN;  // Extra padding below header
             M5.Display.setCursor(MARGIN, yStart);
@@ -605,37 +650,40 @@ void drawLayout() {
             drawHeader(modeName);
 
             // --- FOOTER ---
+            M5.Display.setFont(&fonts::FreeMonoBold9pt7b);
+            M5.Display.setTextSize(1);
             int yFoot = M5.Display.height() - FOOTER_HEIGHT;
             M5.Display.drawLine(0, yFoot, M5.Display.width(), yFoot, TFT_BLACK);
             
             // Buttons: |<<  <   Page   >   >>|
             int w = M5.Display.width();
             int btnW = w / 5;
-            int yText = yFoot + (FOOTER_HEIGHT/2) - (M5.Display.fontHeight()/2);
+            int yCenter = yFoot + FOOTER_HEIGHT / 2;
             
             // Button 1: Start (|<<)
             M5.Display.drawRect(0, yFoot, btnW, FOOTER_HEIGHT, TFT_LIGHTGREY);
-            M5.Display.setCursor(btnW*0.5 - 15, yText); M5.Display.print("|<<");
+            M5.Display.setTextDatum(middle_center);
+            M5.Display.drawString("|<<", btnW / 2, yCenter);
 
             // Button 2: Prev (<)
             M5.Display.drawRect(btnW, yFoot, btnW, FOOTER_HEIGHT, TFT_LIGHTGREY);
-            M5.Display.setCursor(btnW*1.5 - 10, yText); M5.Display.print("<");
+            M5.Display.drawString("<", btnW + btnW / 2, yCenter);
 
             // Center: Page Info
             String pageInfo = String(currentPage + 1) + "/" + String(pages.size());
-            int wPage = M5.Display.textWidth(pageInfo);
-            M5.Display.setCursor((w/2) - (wPage/2), yText);
-            M5.Display.print(pageInfo);
+            M5.Display.drawString(pageInfo, w / 2, yCenter);
 
             // Button 3: Next (>)
             M5.Display.drawRect(btnW*3, yFoot, btnW, FOOTER_HEIGHT, TFT_LIGHTGREY);
-            M5.Display.setCursor(btnW*3.5 - 10, yText); M5.Display.print(">");
+            M5.Display.drawString(">", btnW * 3 + btnW / 2, yCenter);
 
             // Button 4: End (>>|)
             M5.Display.drawRect(btnW*4, yFoot, btnW, FOOTER_HEIGHT, TFT_LIGHTGREY);
-            M5.Display.setCursor(btnW*4.5 - 15, yText); M5.Display.print(">>|");
+            M5.Display.drawString(">>|", btnW * 4 + btnW / 2, yCenter);
+            
+            M5.Display.setTextDatum(top_left);  // Reset
         }
-    } 
+    }
     else if (currentMode == MODE_IMAGE) {
         int imgW = 0, imgH = 0;
         bool valid = getJpegSize(imgBuffer, imgReceivedLen, &imgW, &imgH);
@@ -721,15 +769,15 @@ void handleTouch() {
                 // Vertical Swipe (Font Size) - For Text, MQTT AND Stream
                 if (dy < 0) {
                     // Swipe Up -> Increase Font
-                    if (currentTextSize < MAX_FONT_SIZE) {
-                        currentTextSize++;
+                    if (currentFontLevel < MAX_FONT_LEVEL) {
+                        currentFontLevel++;
                         if (currentMode == MODE_TEXT || currentMode == MODE_MQTT) calculatePages(); // Reflow Text
                         changed = true;
                     }
                 } else {
                     // Swipe Down -> Decrease Font
-                    if (currentTextSize > MIN_FONT_SIZE) {
-                        currentTextSize--;
+                    if (currentFontLevel > MIN_FONT_LEVEL) {
+                        currentFontLevel--;
                         if (currentMode == MODE_TEXT || currentMode == MODE_MQTT) calculatePages(); // Reflow Text
                         changed = true;
                     }
@@ -787,12 +835,16 @@ void handleTouch() {
 void handleText() {
     resetActivity();
     fullText = "";
-    currentTextSize = 2; // Default
+    currentFontLevel = DEFAULT_FONT_LEVEL;
 
     // 1. Check for "text" form field (curl -d "text=hello")
     if (server.hasArg("text")) {
         fullText = server.arg("text");
-        if (server.hasArg("size")) currentTextSize = server.arg("size").toInt();
+        if (server.hasArg("size")) {
+            // Map size 1-4 to font level 0-3
+            int size = server.arg("size").toInt();
+            currentFontLevel = constrain(size - 1, MIN_FONT_LEVEL, MAX_FONT_LEVEL);
+        }
     }
     // 2. Check for "plain" body (JSON or Raw)
     else if (server.hasArg("plain")) {
@@ -856,7 +908,9 @@ void handleText() {
                         valueStart++;
                     }
                     if (sizeStr.length() > 0) {
-                        currentTextSize = sizeStr.toInt();
+                        // Map size 1-4 to font level 0-3
+                        int size = sizeStr.toInt();
+                        currentFontLevel = constrain(size - 1, MIN_FONT_LEVEL, MAX_FONT_LEVEL);
                     }
                 }
             }
@@ -895,7 +949,7 @@ void updateAutoRotation() {
     M5.Imu.getAccel(&ax, &ay, &az);
     
     int newRot = -1;
-    float threshold = 0.5;
+    float threshold = 0.75;  // Higher threshold = less sensitive (~45° tilt required)
 
     if (ay > threshold) newRot = 1;
     else if (ay < -threshold) newRot = 3;
@@ -903,7 +957,7 @@ void updateAutoRotation() {
     else if (ax < -threshold) newRot = 2;
 
     if (newRot >= 0 && newRot != currentRotation) {
-        delay(100); 
+        delay(250);  // Longer debounce - must hold position for 250ms
         float ax2, ay2, az2;
         M5.Imu.getAccel(&ax2, &ay2, &az2);
         
@@ -921,7 +975,7 @@ void updateAutoRotation() {
                 calculatePages();
             }
             drawLayout();
-            delay(300);
+            delay(500);  // Longer cooldown after rotation
         }
     }
 }
@@ -1145,7 +1199,9 @@ void drawStream() {
     // Clear Text Area
     M5.Display.fillRect(0, yStart, scrW, scrH - yStart, TFT_WHITE);
     
-    M5.Display.setTextSize(currentTextSize); 
+    // Use monospace GFX font for stream (logs/data)
+    M5.Display.setFont(monoFonts[currentFontLevel]);
+    M5.Display.setTextSize(1);
     M5.Display.setTextColor(TFT_BLACK);
     
     int lineHeight = M5.Display.fontHeight() * 1.1;
