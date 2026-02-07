@@ -798,14 +798,72 @@ void handleText() {
     // 2. Check for "plain" body (JSON or Raw)
     else if (server.hasArg("plain")) {
         String body = server.arg("plain");
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-
-        if (error) {
-            fullText = body; // Treat as raw text
+        
+        // Check if body looks like JSON
+        if (body.startsWith("{")) {
+            // Use streaming filter to handle large JSON payloads efficiently
+            // Only parse "text" and "size" fields, ignore everything else
+            struct JsonFilter {
+                bool text = false;
+                bool size = false;
+            };
+            
+            // Manual extraction for large payloads to avoid memory issues
+            // Find "text" field value
+            int textStart = body.indexOf("\"text\"");
+            if (textStart >= 0) {
+                // Find the colon after "text"
+                int colonPos = body.indexOf(':', textStart);
+                if (colonPos >= 0) {
+                    // Skip whitespace and find opening quote
+                    int valueStart = colonPos + 1;
+                    while (valueStart < body.length() && (body[valueStart] == ' ' || body[valueStart] == '\t')) {
+                        valueStart++;
+                    }
+                    
+                    if (body[valueStart] == '"') {
+                        valueStart++; // Skip opening quote
+                        // Find closing quote (handle escaped quotes)
+                        int valueEnd = valueStart;
+                        while (valueEnd < body.length()) {
+                            if (body[valueEnd] == '"' && body[valueEnd-1] != '\\') {
+                                break;
+                            }
+                            valueEnd++;
+                        }
+                        fullText = body.substring(valueStart, valueEnd);
+                        // Unescape common sequences
+                        fullText.replace("\\n", "\n");
+                        fullText.replace("\\t", "\t");
+                        fullText.replace("\\\"", "\"");
+                        fullText.replace("\\\\", "\\");
+                    }
+                }
+            }
+            
+            // Find "size" field value (small, can use simple parsing)
+            int sizeStart = body.indexOf("\"size\"");
+            if (sizeStart >= 0) {
+                int colonPos = body.indexOf(':', sizeStart);
+                if (colonPos >= 0) {
+                    int valueStart = colonPos + 1;
+                    while (valueStart < body.length() && (body[valueStart] == ' ' || body[valueStart] == '\t')) {
+                        valueStart++;
+                    }
+                    // Read digits
+                    String sizeStr = "";
+                    while (valueStart < body.length() && isdigit(body[valueStart])) {
+                        sizeStr += body[valueStart];
+                        valueStart++;
+                    }
+                    if (sizeStr.length() > 0) {
+                        currentTextSize = sizeStr.toInt();
+                    }
+                }
+            }
         } else {
-            if (doc["text"].is<const char*>()) fullText = doc["text"].as<String>();
-            if (doc["size"].is<int>()) currentTextSize = doc["size"];
+            // Not JSON, treat as raw text
+            fullText = body;
         }
     }
     // 3. Fallback: Parse 'curl -d "hello"' (treated as key "hello" with empty value)
