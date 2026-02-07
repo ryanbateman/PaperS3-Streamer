@@ -92,6 +92,7 @@ void drawHeader(const char* modeName);
 
 void drawHeader(const char* modeName) {
     int w = M5.Display.width();
+    int yCenter = HEADER_HEIGHT / 2;
     
     // Fill header background
     M5.Display.fillRect(0, 0, w, HEADER_HEIGHT, TFT_LIGHTGREY);
@@ -103,19 +104,14 @@ void drawHeader(const char* modeName) {
     M5.Display.setTextSize(2);
     M5.Display.setTextColor(TFT_BLACK);
     
-    // Calculate vertical center with slight upward bias for visual balance
-    int fontH = M5.Display.fontHeight();
-    int yText = (HEADER_HEIGHT - fontH) / 2 + 1;  // +1 pushes text slightly down from pure center
-    
     // === LEFT: IP Address ===
-    M5.Display.setCursor(MARGIN, yText);
-    M5.Display.print(WiFi.localIP());
+    M5.Display.setTextDatum(middle_left);
+    M5.Display.drawString(WiFi.localIP().toString(), MARGIN, yCenter);
     
     // === CENTER: Mode Name ===
     if (modeName && strlen(modeName) > 0) {
-        int modeWidth = M5.Display.textWidth(modeName);
-        M5.Display.setCursor((w - modeWidth) / 2, yText);
-        M5.Display.print(modeName);
+        M5.Display.setTextDatum(middle_center);
+        M5.Display.drawString(modeName, w / 2, yCenter);
     }
     
     // === RIGHT: Battery Icon + Percentage ===
@@ -129,15 +125,15 @@ void drawHeader(const char* modeName) {
     int batTerminalW = 3;
     int batIconGap = 4;  // Gap between icon and text
     
-    // Position from right edge: MARGIN | batText | gap | icon | terminal
+    // Position from right edge: MARGIN | batText | gap | terminal | icon
     int batTextX = w - MARGIN - batTextWidth;
-    int batIconX = batTextX - batIconGap - batIconW;
+    int batIconX = batTextX - batIconGap - batTerminalW - batIconW;
     int batIconY = (HEADER_HEIGHT - batIconH) / 2;
     
     // Draw battery outline (main body)
     M5.Display.drawRect(batIconX, batIconY, batIconW, batIconH, TFT_BLACK);
     
-    // Draw battery terminal (the small nub on the right side of icon, left of text)
+    // Draw battery terminal (the small nub on the right side of icon)
     int termX = batIconX + batIconW;
     int termY = batIconY + (batIconH - 6) / 2;  // Centered vertically, 6px tall
     M5.Display.fillRect(termX, termY, batTerminalW, 6, TFT_BLACK);
@@ -151,9 +147,12 @@ void drawHeader(const char* modeName) {
                            fillW, batIconH - (fillPadding * 2), TFT_BLACK);
     }
     
-    // Draw battery percentage text
-    M5.Display.setCursor(batTextX, yText);
-    M5.Display.print(batText);
+    // Draw battery percentage text (vertically centered with icon)
+    M5.Display.setTextDatum(middle_left);
+    M5.Display.drawString(batText, batTextX, yCenter);
+    
+    // Reset datum to default for other code
+    M5.Display.setTextDatum(top_left);
 }
 
 void setup() {

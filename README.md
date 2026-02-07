@@ -7,9 +7,10 @@ A wireless E-Ink display system for the [M5Stack PaperS3](https://shop.m5stack.c
 - **Five Display Modes**: Text, Image, Stream, Map, and MQTT
 - **Auto-Rotation**: Integrated IMU rotates content when you rotate the device
 - **Auto-Shutdown**: Powers off after 3 minutes of inactivity to save battery
-- **Retain Mode**: Keep content visible on screen even when the device sleeps
+- **Content Retention**: E-ink naturally retains displayed content when device powers off
 - **Touch Gestures**: Swipe to navigate pages, change font size, or toggle UI
 - **REST API**: Simple HTTP endpoints for easy integration
+- **Unified Header**: Consistent status bar showing IP, mode, battery icon with charge level
 
 ## Installation
 
@@ -242,33 +243,17 @@ mosquitto_pub -h test.mosquitto.org -t "test/paper" -m "Hello from MQTT!"
 
 ---
 
-### Retain Mode
+## Power & Content Retention
 
-Keep content visible on the e-ink display even when the device goes to sleep. When retain mode is enabled, the device will show a "Sleeping..." indicator at the bottom while preserving your content. On wake, the screen clears and shows the welcome screen.
+E-ink displays naturally retain their content without power. Paper Piper takes advantage of this:
 
-**Using the Python client:**
-```bash
-# Send content with retain flag
-python client/paper_cli.py text "This will stay visible" --retain
-python client/paper_cli.py image photo.jpg --retain
-python client/paper_cli.py map --location "Paris" --retain
+- **When the device times out** (3 minutes of inactivity): The content is redrawn without the header/footer UI, a "Sleeping..." indicator appears at the bottom, and the device powers off. Your content remains visible on the e-ink display.
 
-# Toggle retain mode separately
-python client/paper_cli.py retain --on
-python client/paper_cli.py retain --off
-python client/paper_cli.py retain  # toggles current state
-```
+- **When you press the power button**: The e-ink display keeps whatever was on screen when power was cut.
 
-**Using curl:**
-```bash
-# Enable retain mode
-curl -X POST http://192.168.1.100/api/retain \
-  -H "Content-Type: application/json" \
-  -d '{"retain": true}'
+- **When you wake the device**: Touch the screen or press the power button. The welcome screen appears, ready for new content.
 
-# Toggle retain mode
-curl -X POST http://192.168.1.100/api/retain
-```
+This means you can send an image, map, or text to the device, and it will remain visible indefinitely as a "poster" even after the device powers off - no battery drain.
 
 ---
 
@@ -276,12 +261,11 @@ curl -X POST http://192.168.1.100/api/retain
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/status` | GET | Device status (mode, memory, screen size, rotation, retain) |
+| `/api/status` | GET | Device status (mode, memory, screen size, rotation) |
 | `/api/screenshot` | GET | Current display as BMP image |
 | `/api/text` | POST | Display text content |
 | `/api/image` | POST | Display image (multipart upload) |
 | `/api/mqtt` | POST | Configure MQTT subscription |
-| `/api/retain` | POST | Set or toggle retain mode |
 | Port `2323` | TCP | Raw stream connection |
 
 ### Status Response Example
@@ -292,10 +276,22 @@ curl -X POST http://192.168.1.100/api/retain
   "screen_width": 960,
   "screen_height": 540,
   "rotation": 1,
-  "wifi_rssi": -62,
-  "retain": false
+  "wifi_rssi": -62
 }
 ```
+
+### Custom Headers
+
+When sending images via `/api/image`, you can include the `X-Content-Type` header to indicate the content type:
+
+```bash
+# The CLI automatically sets this for maps
+curl -X POST http://192.168.1.100/api/image \
+  -H "X-Content-Type: map" \
+  -F "file=@map.jpg"
+```
+
+This displays "MAP" instead of "IMAGE" in the header bar.
 
 ---
 
