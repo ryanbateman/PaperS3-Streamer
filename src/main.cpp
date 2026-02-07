@@ -59,7 +59,6 @@ M5Canvas canvas(&M5.Display); // Global Sprite
 // Power Management
 const uint32_t TIMEOUT_MS = 180000; // 3 Minutes
 uint32_t lastActivityTime = 0;
-bool retainOnSleep = false; // When true, keep content on screen when sleeping
 
 void resetActivity() {
     lastActivityTime = millis();
@@ -84,7 +83,6 @@ void handleMqtt();
 void handleMqttLoop();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttReconnect();
-void handleRetain();
 void drawSleepOverlay();
 void drawHeader(const char* modeName);
 
@@ -180,7 +178,6 @@ void setup() {
     server.on("/api/screenshot", HTTP_GET, handleScreenshot);
     server.on("/api/text", HTTP_POST, handleText);
     server.on("/api/mqtt", HTTP_POST, handleMqtt);
-    server.on("/api/retain", HTTP_POST, handleRetain);
     server.on("/api/image", HTTP_POST, 
         []() { server.send(200, "application/json", "{\"status\":\"ok\"}"); },
         handleImageUpload
@@ -203,17 +200,17 @@ void loop() {
     updateAutoRotation(); 
     handleTouch();        
     
-    // Timeout Check
+    // Timeout Check - always retain content on e-ink when sleeping
     if (millis() - lastActivityTime > TIMEOUT_MS) {
-        if (retainOnSleep && currentMode != MODE_NONE) {
-            // Keep content, just add sleep overlay at bottom
+        if (currentMode != MODE_NONE) {
+            // Content displayed: redraw without UI chrome + "Sleeping..." overlay
             drawSleepOverlay();
             delay(2000);
         } else {
-            drawWelcome(true); // Show "Sleeping..."
-            delay(2000);       // Give it time to render
+            // No content: show welcome screen with "Sleeping..."
+            drawWelcome(true);
+            delay(2000);
         }
-        retainOnSleep = false; // Reset for next wake
         M5.Power.powerOff();
     }
     
@@ -531,35 +528,8 @@ void handleMqtt() {
 }
 
 // =================================================================================
-// Retain Mode Functions
+// Sleep Overlay (content retained on e-ink when device powers off)
 // =================================================================================
-
-void handleRetain() {
-    resetActivity();
-    
-    String body = "";
-    if (server.hasArg("plain")) {
-        body = server.arg("plain");
-    }
-    
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, body);
-    
-    if (!error && doc["retain"].is<bool>()) {
-        retainOnSleep = doc["retain"].as<bool>();
-    } else {
-        // Toggle if no body or invalid JSON
-        retainOnSleep = !retainOnSleep;
-    }
-    
-    JsonDocument resp;
-    resp["status"] = "ok";
-    resp["retain"] = retainOnSleep;
-    
-    String response;
-    serializeJson(resp, response);
-    server.send(200, "application/json", response);
-}
 
 void drawSleepOverlay() {
     // Redraw content without UI elements, with proper padding
@@ -935,7 +905,6 @@ void handleStatus() {
     doc["screen_width"] = M5.Display.width();
     doc["screen_height"] = M5.Display.height();
     doc["rotation"] = currentRotation;
-    doc["retain"] = retainOnSleep;
     
     // MQTT Status
     if (currentMode == MODE_MQTT) {
