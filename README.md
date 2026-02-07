@@ -148,6 +148,8 @@ nc 192.168.1.100 2323
 - Swipe up/down: Increase/decrease font size
 - Tap: Toggle header UI
 
+**Note:** The device stays awake while receiving data. If no data is received for 3 minutes, the device will sleep (retaining the last content on screen).
+
 ---
 
 ### Map Mode
@@ -240,6 +242,8 @@ mosquitto_pub -h test.mosquitto.org -t "test/paper" -m "Hello from MQTT!"
 - Auto-reconnect on connection loss
 - Messages displayed with pagination (swipe to navigate)
 - Optional username/password authentication
+
+**Note:** The device stays awake while receiving messages. If no messages are received for 3 minutes, the device will sleep (retaining the last message on screen).
 
 ---
 
